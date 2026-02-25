@@ -3,88 +3,73 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chatbot Comparator</title>
+    <title>Leave App</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="page">
-      <header class="hero">
-        <h1>Side-by-side Chatbot Comparator</h1>
-        <p>Compare local vLLM with Qwen API responses and latency.</p>
-      </header>
-
-      <section class="controls">
-        <label class="field">
-          <span>Question</span>
-          <textarea id="question" rows="3" placeholder="Ask something..."></textarea>
-        </label>
-        <button id="send" class="primary">Send</button>
+    <main class="container">
+      <section id="auth-card" class="card">
+        <h1>Leave App</h1>
+        <input id="username" placeholder="Username" />
+        <input id="password" type="password" placeholder="Password" />
+        <div class="row">
+          <button id="login-btn">Login</button>
+          <button id="register-btn" class="secondary">Register</button>
+        </div>
+        <p id="auth-msg"></p>
       </section>
 
-      <section class="results">
-        <article class="result-panel" id="left-result">
-          <header>
-            <h3>Left Bot</h3>
-            <div class="meta">
-              <span class="badge" id="left-bot-name">-</span>
-              <span class="badge" id="left-model-name">-</span>
-              <span class="badge" id="left-latency">-</span>
-            </div>
-          </header>
-          <pre class="answer" id="left-answer">Waiting for input.</pre>
-        </article>
+      <section id="app" class="hidden">
+        <header class="card">
+          <div class="row between">
+            <h2>Dashboard</h2>
+            <button id="logout-btn" class="secondary">Logout</button>
+          </div>
+          <p id="me"></p>
+          <h3 id="balance">Balance: 0</h3>
+        </header>
 
-        <article class="result-panel" id="right-result">
-          <header>
-            <h3>Right Bot</h3>
-            <div class="meta">
-              <span class="badge" id="right-bot-name">-</span>
-              <span class="badge" id="right-model-name">-</span>
-              <span class="badge" id="right-latency">-</span>
-            </div>
-          </header>
-          <pre class="answer" id="right-answer">Waiting for input.</pre>
-        </article>
-      </section>
+        <section class="card">
+          <h3>Create Record</h3>
+          <select id="record-type">
+            <option value="FULL_DAY">Full day</option>
+            <option value="HALF_AM">Half AM</option>
+            <option value="HALF_PM">Half PM</option>
+            <option value="RANGE">Range</option>
+            <option value="LATE">Late</option>
+            <option value="EARLY">Early</option>
+          </select>
+          <input id="start-date" type="date" />
+          <input id="end-date" type="date" />
+          <div class="row">
+            <select id="start-half"><option>AM</option><option>PM</option></select>
+            <select id="end-half"><option>AM</option><option>PM</option></select>
+          </div>
+          <input id="minutes" type="number" min="1" placeholder="Minutes (for late/early)" />
+          <textarea id="note" placeholder="Note"></textarea>
+          <button id="create-btn">Save</button>
+          <p id="create-msg"></p>
+        </section>
 
-      <section class="bot-config">
-        <div class="bot-card">
-          <h2>Left Bot (Local vLLM)</h2>
-          <label class="field">
-            <span>Bot name</span>
-            <input id="left-name" value="Qwen3-30B Local" />
-          </label>
-          <label class="field">
-            <span>Model</span>
-            <input id="left-model" value="/data/qwen80b/..." />
-          </label>
-          <label class="field">
-            <span>Endpoint</span>
-            <input id="left-endpoint" value="http://127.0.0.1:8000/v1/chat/completions" />
-          </label>
-        </div>
+        <section class="card">
+          <h3>My Records</h3>
+          <ul id="my-list"></ul>
+        </section>
 
-        <div class="bot-card">
-          <h2>Right Bot (Qwen API)</h2>
-          <label class="field">
-            <span>Bot name</span>
-            <input id="right-name" value="Qwen-Max" />
-          </label>
-          <label class="field">
-            <span>Model</span>
-            <input id="right-model" value="qwen-max" />
-          </label>
-          <label class="field">
-            <span>Endpoint (optional)</span>
-            <input
-              id="right-endpoint"
-              placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-            />
-          </label>
-        </div>
+        <section id="admin-panel" class="card hidden">
+          <h3>Admin Panel</h3>
+          <div class="row">
+            <input id="new-user-name" placeholder="new username" />
+            <input id="new-user-password" type="password" placeholder="password" />
+          </div>
+          <button id="create-user-btn">Create user</button>
+          <h4>All Users</h4>
+          <ul id="user-list"></ul>
+          <h4>All Leave Records</h4>
+          <ul id="all-records"></ul>
+        </section>
       </section>
     </main>
-
     <script src="app.js"></script>
   </body>
 </html>
