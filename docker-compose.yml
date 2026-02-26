@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: leave
+      POSTGRES_PASSWORD: leave
+      POSTGRES_DB: leave
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leave -d leave"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://leave:leave@postgres:5432/leave
+      JWT_SECRET: change-me
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "scheduler.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://leave:leave@postgres:5432/leave
+      JWT_SECRET: change-me
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "4036:80"
+    depends_on:
+      fastapi:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
