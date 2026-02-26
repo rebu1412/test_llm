@@ -1,110 +1,99 @@
-const sendButton = document.getElementById("send");
-const questionInput = document.getElementById("question");
+const API = `${window.location.origin}/api`;
+let token = localStorage.getItem('token');
+let me = null;
 
-const leftName = document.getElementById("left-name");
-const leftModel = document.getElementById("left-model");
-const leftEndpoint = document.getElementById("left-endpoint");
+const $ = (id) => document.getElementById(id);
 
-const rightName = document.getElementById("right-name");
-const rightModel = document.getElementById("right-model");
-const rightEndpoint = document.getElementById("right-endpoint");
-
-const leftAnswer = document.getElementById("left-answer");
-const rightAnswer = document.getElementById("right-answer");
-
-const leftBotName = document.getElementById("left-bot-name");
-const leftModelName = document.getElementById("left-model-name");
-const leftLatency = document.getElementById("left-latency");
-
-const rightBotName = document.getElementById("right-bot-name");
-const rightModelName = document.getElementById("right-model-name");
-const rightLatency = document.getElementById("right-latency");
-
-function setLoading() {
-  leftAnswer.textContent = "Loading...";
-  rightAnswer.textContent = "Loading...";
-  leftLatency.textContent = "⏱";
-  rightLatency.textContent = "⏱";
+async function api(path, options = {}) {
+  const headers = options.headers || {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (!(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+  const res = await fetch(`${API}${path}`, { ...options, headers });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
-function setResult(result, side) {
-  const targetAnswer = side === "left" ? leftAnswer : rightAnswer;
-  const targetBotName = side === "left" ? leftBotName : rightBotName;
-  const targetModelName = side === "left" ? leftModelName : rightModelName;
-  const targetLatency = side === "left" ? leftLatency : rightLatency;
-
-  targetBotName.textContent = result.bot_name;
-  targetModelName.textContent = result.model;
-  targetLatency.textContent = `⏱ ${Math.round(result.latency_ms)} ms`;
-
-  if (result.error) {
-    targetAnswer.textContent = `Error: ${result.error}`;
-    targetAnswer.classList.add("error");
-  } else {
-    targetAnswer.textContent = result.answer.trim();
-    targetAnswer.classList.remove("error");
-  }
+async function loginOrRegister(path) {
+  const username = $('username').value.trim();
+  const password = $('password').value;
+  const data = await api(path, { method: 'POST', body: JSON.stringify({ username, password }) });
+  token = data.access_token;
+  localStorage.setItem('token', token);
+  await loadApp();
 }
 
-async function sendQuestion() {
-  const question = questionInput.value.trim();
-  if (!question) {
-    return;
-  }
+function toIsoDate(value) {
+  return value ? `${value}T00:00:00` : null;
+}
 
-  sendButton.disabled = true;
-  questionInput.disabled = true;
-  setLoading();
-
+async function createRecord() {
   const payload = {
-    question,
-    left_bot: {
-      type: "vllm",
-      name: leftName.value.trim(),
-      endpoint: leftEndpoint.value.trim(),
-      model: leftModel.value.trim(),
-    },
-    right_bot: {
-      type: "qwen_api",
-      name: rightName.value.trim(),
-      endpoint: rightEndpoint.value.trim() || null,
-      model: rightModel.value.trim(),
-    },
+    record_type: $('record-type').value,
+    start_date: toIsoDate($('start-date').value),
+    end_date: toIsoDate($('end-date').value),
+    start_half: $('start-half').value,
+    end_half: $('end-half').value,
+    minutes: $('minutes').value ? Number($('minutes').value) : null,
+    note: $('note').value || null,
   };
-
-  try {
-    const response = await fetch("http://127.0.0.1:3636/chat/compare", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(message || "Request failed");
-    }
-
-    const data = await response.json();
-    data.results.forEach((result) => setResult(result, result.side));
-  } catch (error) {
-    leftAnswer.textContent = "Error fetching response.";
-    rightAnswer.textContent = "Error fetching response.";
-    leftAnswer.classList.add("error");
-    rightAnswer.classList.add("error");
-    leftLatency.textContent = "⏱";
-    rightLatency.textContent = "⏱";
-  } finally {
-    sendButton.disabled = false;
-    questionInput.disabled = false;
-  }
+  await api('/leave', { method: 'POST', body: JSON.stringify(payload) });
+  $('create-msg').textContent = 'Saved';
+  await Promise.all([loadBalance(), loadMyRecords(), loadAllRecords()]);
 }
 
-sendButton.addEventListener("click", sendQuestion);
-questionInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    sendQuestion();
-  }
-});
+async function loadBalance() {
+  const data = await api('/leave/balance');
+  $('balance').textContent = `Balance: ${data.leave_balance}`;
+}
+
+function renderRecords(target, items) {
+  target.innerHTML = '';
+  items.forEach((x) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<b>${x.record_type}</b> - ${x.total_leave_days} day(s)
+      <div class='small'>${x.start_datetime.slice(0, 10)} ${x.note || ''}</div>`;
+    target.appendChild(li);
+  });
+}
+
+async function loadMyRecords() {
+  const data = await api('/leave/my?page=1&page_size=20');
+  renderRecords($('my-list'), data.items);
+}
+
+async function loadUsers() {
+  if (me.role !== 'admin') return;
+  const users = await api('/admin/users');
+  $('user-list').innerHTML = users.map((u) => `<li>${u.username} - ${u.role} - balance ${u.leave_balance}</li>`).join('');
+}
+
+async function loadAllRecords() {
+  if (me.role !== 'admin') return;
+  const data = await api('/admin/all-records?page=1&page_size=20');
+  renderRecords($('all-records'), data.items);
+}
+
+async function createUser() {
+  await api('/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({ username: $('new-user-name').value, password: $('new-user-password').value, role: 'user', leave_balance: 0 }),
+  });
+  await loadUsers();
+}
+
+async function loadApp() {
+  me = await api('/auth/me');
+  $('auth-card').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  $('me').textContent = `${me.username} (${me.role})`;
+  if (me.role === 'admin') $('admin-panel').classList.remove('hidden');
+  await Promise.all([loadBalance(), loadMyRecords(), loadUsers(), loadAllRecords()]);
+}
+
+$('login-btn').onclick = () => loginOrRegister('/auth/login').catch((e) => $('auth-msg').textContent = e.message);
+$('register-btn').onclick = () => loginOrRegister('/auth/register').catch((e) => $('auth-msg').textContent = e.message);
+$('create-btn').onclick = () => createRecord().catch((e) => $('create-msg').textContent = e.message);
+$('create-user-btn').onclick = () => createUser().catch((e) => alert(e.message));
+$('logout-btn').onclick = () => { localStorage.removeItem('token'); window.location.reload(); };
+
+if (token) loadApp().catch(() => { localStorage.removeItem('token'); });

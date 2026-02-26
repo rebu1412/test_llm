@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: leave
+      POSTGRES_PASSWORD: leave
+      POSTGRES_DB: leave
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://leave:leave@postgres:5432/leave
+      JWT_SECRET: change-me
+    depends_on:
+      - postgres
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "scheduler.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://leave:leave@postgres:5432/leave
+      JWT_SECRET: change-me
+    depends_on:
+      - postgres
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "4036:80"
+    depends_on:
+      - fastapi
+
+volumes:
+  pgdata:
